@@ -41,6 +41,26 @@ const sortedLessons = computed(() => {
 })
 
 // ======================================
+// SHOPPING CART
+// ======================================
+
+// Convert saved lesson IDs into lesson objects for display.
+// The same lesson may appear more than once when multiple spaces are added.
+const cartLessons = computed(() => {
+  return cart.value
+    .map(id => lessons.value.find(lesson => lesson._id === id))
+    .filter(Boolean)
+})
+
+// Sum the prices of all selected spaces
+const cartTotal = computed(() => {
+  return cartLessons.value.reduce(
+    (total, lesson) => total + Number(lesson.price),
+    0
+  )
+})
+
+// ======================================
 // NAVIGATION
 // ======================================
 
@@ -71,6 +91,18 @@ function showFaculty() {
     top: 0,
     behavior: 'smooth'
   })
+}
+
+// Open or close the cart using the same navigation button
+function toggleCart() {
+  if (cart.value.length === 0) return
+
+  if (currentPage.value === 'cart') {
+    showHome('courses')
+  } else {
+    currentPage.value = 'cart'
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 }
 
 // Generate Faculty subject tabs from MongoDB
@@ -123,6 +155,15 @@ function addToCart(lesson) {
   console.log('Cart:', cart.value)
 }
 
+// Remove one selected space and restore the lesson's availability
+function removeFromCart(index) {
+  const lesson = cartLessons.value[index]
+  if (!lesson) return
+
+  cart.value.splice(index, 1)
+  lesson.space += 1
+}
+
 onMounted(fetchLessons)
 </script>
 
@@ -163,6 +204,16 @@ onMounted(fetchLessons)
 
           <button @click="showHome('about')">
             About Us
+          </button>
+
+          <!-- Disabled until at least one lesson is added -->
+          <button
+            class="cart-nav-button"
+            :class="{ active: currentPage === 'cart' }"
+            :disabled="cart.length === 0"
+            @click="toggleCart"
+          >
+            Cart ({{ cart.length }})
           </button>
         </nav>
 
@@ -425,7 +476,7 @@ onMounted(fetchLessons)
     </main>
 
     <!-- FACULTY PAGE -->
-    <main v-else class="faculty-page">
+    <main v-else-if="currentPage === 'faculty'" class="faculty-page">
       <div class="section-inner">
 
         <div class="section-heading">
@@ -493,6 +544,57 @@ onMounted(fetchLessons)
 
         </div>
 
+      </div>
+    </main>
+
+    <!-- SHOPPING CART PAGE -->
+    <main v-else class="cart-page">
+      <div class="section-inner">
+        <p class="section-label">YOUR SELECTED LESSONS</p>
+        <h1>Shopping Cart</h1>
+
+        <p class="section-description">
+          Review the spaces you have selected. You can remove a space
+          before proceeding to checkout.
+        </p>
+
+        <p v-if="cartLessons.length === 0" class="status-message">
+          Your shopping cart is empty.
+        </p>
+
+        <div v-else class="cart-list">
+          <article
+            v-for="(lesson, index) in cartLessons"
+            :key="`${lesson._id}-${index}`"
+            class="cart-item"
+          >
+            <div class="cart-item-info">
+              <h2>{{ lesson.topic }}</h2>
+              <p>{{ lesson.location }}, Mauritius</p>
+              <span>1 space · Rs {{ lesson.price }}</span>
+            </div>
+
+            <button
+              class="remove-cart-button"
+              @click="removeFromCart(index)"
+            >
+              Remove
+            </button>
+          </article>
+        </div>
+
+        <div class="cart-total">
+          <span>Total ({{ cart.length }} spaces)</span>
+          <strong>Rs {{ cartTotal }}</strong>
+        </div>
+
+        <button class="back-to-courses-button" @click="showHome('courses')">
+          Continue Browsing Lessons
+        </button>
+
+        <p class="checkout-note">
+          Checkout and order submission will be added in the next stage.
+        </p>
       </div>
     </main>
 
@@ -1149,6 +1251,120 @@ button {
   color: #66756b;
   line-height: 1.8;
   margin-bottom: 0;
+}
+
+/* ======================================
+   SHOPPING CART PAGE
+====================================== */
+
+.nav-tabs .cart-nav-button {
+  border: 1px solid #c5ab75;
+  border-radius: 4px;
+  padding: 10px 14px;
+}
+
+.nav-tabs .cart-nav-button:disabled {
+  border-color: #64796b;
+  color: #8a9c90;
+  cursor: not-allowed;
+}
+
+.cart-page {
+  background: #f5f2e9;
+  min-height: 70vh;
+}
+
+.cart-page h1 {
+  font: normal 42px Georgia, serif;
+  color: #19382d;
+  margin: 0 0 20px;
+}
+
+.cart-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 32px;
+}
+
+.cart-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 22px;
+  border: 1px solid #e2e5dc;
+  border-left: 4px solid #c5ab75;
+  border-radius: 4px;
+  background: white;
+}
+
+.cart-item h2 {
+  font: normal 23px Georgia, serif;
+  color: #19382d;
+  margin: 0 0 10px;
+}
+
+.cart-item p {
+  color: #66756b;
+  margin: 0 0 8px;
+}
+
+.cart-item span {
+  color: #19382d;
+  font-weight: bold;
+  font-size: 13px;
+}
+
+.remove-cart-button,
+.back-to-courses-button {
+  border-radius: 4px;
+  padding: 12px 18px;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.remove-cart-button {
+  border: 1px solid #b74a4a;
+  color: #a52e2e;
+  background: white;
+}
+
+.remove-cart-button:hover {
+  background: #fff2f2;
+}
+
+.cart-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 22px 0;
+  margin-top: 15px;
+  border-top: 2px solid #c5ab75;
+  font-size: 18px;
+  color: #19382d;
+}
+
+.back-to-courses-button {
+  background: #19382d;
+  color: #f5f2e9;
+  border: 1px solid #19382d;
+}
+
+.back-to-courses-button:hover {
+  background: #2d5944;
+}
+
+.checkout-note {
+  color: #66756b;
+  font-size: 13px;
+  margin-top: 18px;
+}
+
+@media (max-width: 480px) {
+  .cart-item {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
 
 /* ======================================
