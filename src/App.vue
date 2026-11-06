@@ -11,6 +11,30 @@ const loading = ref(true)
 const errorMessage = ref('')
 // Store the IDs of lessons added to the cart
 const cart = ref([])
+// Checkout form
+const customerName = ref('')
+const customerPhone = ref('')
+const checkoutMessage = ref('')
+
+// Validate the customer's details using JavaScript
+const canCheckout = computed(() => {
+  const validName = /^[A-Za-z]+(?: [A-Za-z]+)*$/.test(
+    customerName.value.trim()
+  )
+
+  const validPhone = /^[0-9]+$/.test(
+    customerPhone.value.trim()
+  )
+
+  return cart.value.length > 0 && validName && validPhone
+})
+
+function prepareCheckout() {
+  if (!canCheckout.value) return
+
+  checkoutMessage.value =
+    'Details validated. Backend order submission is not yet connected.'
+}
 
 // ======================================
 // SORTING
@@ -419,57 +443,28 @@ onMounted(fetchLessons)
       <!-- ABOUT US SECTION -->
       <section id="about" class="about-section">
         <div class="section-inner about-layout">
-
           <div class="about-heading">
-
-            <p class="eyebrow">
-              ABOUT OUR INSTITUTION
-            </p>
-
-            <h2>
-              Education with purpose.
-            </h2>
-
+            <p class="eyebrow">ABOUT OUR INSTITUTION</p>
+            <h2>Education with purpose.</h2>
             <div class="gold-divider"></div>
-
           </div>
 
           <div class="about-content">
-
             <p>
-              Huz Academy is a fictional educational
-              institution dedicated to supporting
-              students beyond the traditional classroom.
+              This is a fictional academy created by
+              <strong>Huzaifa Abawa</strong> for the
+              <strong>CST3144 Full Stack Development Coursework</strong>.
             </p>
 
             <p>
-              Our vision is to create an environment
-              where academic progress, creative expression
-              and personal development are equally valued.
+              He hopes you enjoy and appreciate the time
+              and effort that went into creating this website!
             </p>
 
-            <p>
-              From Mathematics and Programming to Art,
-              Music and Sports, our programmes aim to
-              encourage curiosity and lifelong learning.
-            </p>
-
-            <p>
-              We believe that every student deserves
-              access to educational opportunities that
-              help them build confidence, discover
-              their interests and achieve their potential.
-            </p>
-
-            <button
-              class="outline-button"
-              @click="showFaculty"
-            >
+            <button class="outline-button" @click="showFaculty">
               Explore Our Faculty
             </button>
-
           </div>
-
         </div>
       </section>
 
@@ -592,9 +587,45 @@ onMounted(fetchLessons)
           Continue Browsing Lessons
         </button>
 
-        <p class="checkout-note">
-          Checkout and order submission will be added in the next stage.
-        </p>
+        
+        <!-- CHECKOUT FORM: validation only; no backend submission yet -->
+        <form class="checkout-form" @submit.prevent="prepareCheckout">
+          <h2>Checkout</h2>
+
+          <label for="customerName">Full Name</label>
+          <input
+            id="customerName"
+            v-model="customerName"
+            type="text"
+            placeholder="Enter your full name"
+            autocomplete="name"
+            @input="checkoutMessage = ''"
+          />
+
+          <label for="customerPhone">Phone Number</label>
+          <input
+            id="customerPhone"
+            v-model="customerPhone"
+            type="tel"
+            inputmode="numeric"
+            placeholder="Enter your phone number"
+            autocomplete="tel"
+            @input="checkoutMessage = ''"
+          />
+
+          <button
+            type="submit"
+            class="checkout-button"
+            :disabled="!canCheckout"
+          >
+            Checkout
+          </button>
+
+          <p v-if="checkoutMessage" class="checkout-message" role="status">
+            {{ checkoutMessage }}
+          </p>
+        </form>
+
       </div>
     </main>
 
@@ -1354,16 +1385,90 @@ button {
   background: #2d5944;
 }
 
-.checkout-note {
-  color: #66756b;
-  font-size: 13px;
-  margin-top: 18px;
-}
-
 @media (max-width: 480px) {
   .cart-item {
     align-items: stretch;
     flex-direction: column;
+  }
+}
+
+/* ======================================
+   CHECKOUT FORM
+====================================== */
+
+.checkout-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 520px;
+  margin-top: 35px;
+  padding: 30px;
+  background: #ffffff;
+  border: 1px solid #e2e5dc;
+  border-top: 4px solid #c5ab75;
+  border-radius: 5px;
+}
+
+.checkout-form h2 {
+  font: normal 28px Georgia, serif;
+  color: #19382d;
+  margin: 0 0 8px;
+}
+
+.checkout-form label {
+  font-size: 13px;
+  font-weight: bold;
+  color: #19382d;
+}
+
+.checkout-form input {
+  width: 100%;
+  padding: 13px;
+  border: 1px solid #ced6cb;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #19382d;
+  font: inherit;
+}
+
+.checkout-form input:focus-visible {
+  outline: 2px solid #c5ab75;
+  outline-offset: 2px;
+}
+
+.checkout-button {
+  margin-top: 12px;
+  padding: 14px;
+  background: #19382d;
+  color: #ffffff;
+  border: 1px solid #19382d;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.checkout-button:hover:not(:disabled) {
+  background: #2d5944;
+}
+
+.checkout-button:disabled {
+  background: #cbd5ce;
+  border-color: #cbd5ce;
+  color: #66756b;
+  cursor: not-allowed;
+}
+
+.checkout-message {
+  margin: 5px 0 0;
+  color: #19382d;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@media (max-width: 480px) {
+  .checkout-form {
+    padding: 22px;
   }
 }
 
