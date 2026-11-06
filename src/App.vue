@@ -9,6 +9,8 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 const lessons = ref([])
 const loading = ref(true)
 const errorMessage = ref('')
+// Store the IDs of lessons added to the cart
+const cart = ref([])
 
 // ======================================
 // SORTING
@@ -103,6 +105,22 @@ async function fetchLessons() {
   } finally {
     loading.value = false
   }
+}
+
+// Add one available space to the shopping cart
+function addToCart(lesson) {
+  // Prevent adding a fully booked lesson
+  if (lesson.space <= 0) {
+    return
+  }
+
+  // Store one entry per selected space
+  cart.value.push(lesson._id)
+
+  // Update displayed availability reactively
+  lesson.space -= 1
+
+  console.log('Cart:', cart.value)
 }
 
 onMounted(fetchLessons)
@@ -251,6 +269,9 @@ onMounted(fetchLessons)
             </select>
 
           </div>
+          <p class="cart-summary">
+            Items in Cart: {{ cart.length }}
+          </p>
 
           <!-- LOADING AND ERROR HANDLING -->
           <p v-if="loading" class="status-message">
@@ -324,6 +345,16 @@ onMounted(fetchLessons)
                 >
                   Fully Booked
                 </p>
+
+                <!-- ADD TO CART BUTTON -->
+                <button
+                  class="add-to-cart-button"
+                  :disabled="lesson.space <= 0"
+                  @click="addToCart(lesson)"
+                >
+                  {{ lesson.space > 0 ? 'Add to Cart' : 'Fully Booked' }}
+                </button>
+
 
               </div>
 
@@ -488,7 +519,9 @@ onMounted(fetchLessons)
   </div>
 </template>
 
+
 <style scoped>
+
 /* ======================================
    GENERAL LAYOUT
 ====================================== */
@@ -511,6 +544,7 @@ button {
   cursor: pointer;
 }
 
+/* Center all main content containers */
 .header-inner,
 .hero-inner,
 .section-inner,
@@ -524,7 +558,7 @@ button {
 }
 
 /* ======================================
-   NAVIGATION
+   NAVIGATION BAR
 ====================================== */
 
 .site-header {
@@ -622,6 +656,10 @@ button {
   gap: 55px;
 }
 
+.hero-copy {
+  min-width: 0;
+}
+
 .eyebrow,
 .section-label {
   color: #c5ab75;
@@ -654,6 +692,8 @@ button {
   margin-top: 35px;
 }
 
+/* HERO BUTTONS */
+
 .gold-button,
 .outline-button {
   padding: 14px 22px;
@@ -671,6 +711,7 @@ button {
 
 .gold-button:hover {
   background: #dcc99c;
+  border-color: #dcc99c;
 }
 
 .outline-button {
@@ -691,6 +732,7 @@ button {
   position: relative;
   width: 100%;
   height: 430px;
+  min-width: 0;
   overflow: hidden;
   border: 1px solid #c5ab75;
   border-radius: 5px;
@@ -794,7 +836,7 @@ button {
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 35px;
+  margin-bottom: 20px;
 }
 
 .sort-controls label {
@@ -804,13 +846,34 @@ button {
 }
 
 .sort-controls select {
-  background: white;
+  background: #ffffff;
   color: #19382d;
   border: 1px solid #ced6cb;
   border-radius: 4px;
   padding: 11px 13px;
   min-width: 130px;
   cursor: pointer;
+}
+
+.sort-controls select:focus {
+  outline: 2px solid #c5ab75;
+}
+
+/* ======================================
+   CART SUMMARY - NEW
+====================================== */
+
+.cart-summary {
+  display: inline-block;
+  margin: 0 0 30px;
+  padding: 11px 16px;
+  background: #e7ede6;
+  color: #19382d;
+  border: 1px solid #cddbcf;
+  border-left: 4px solid #c5ab75;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: bold;
 }
 
 /* ======================================
@@ -846,7 +909,8 @@ button {
   transform: translateY(-3px);
 }
 
-/* NEW: INDIVIDUAL COURSE IMAGES */
+/* COURSE IMAGES */
+
 .course-image {
   display: block;
   width: 100%;
@@ -856,6 +920,8 @@ button {
   margin-bottom: 22px;
   background: #e8eae3;
 }
+
+/* COURSE INFORMATION */
 
 .card-top {
   display: flex;
@@ -889,6 +955,10 @@ button {
   line-height: 1.7;
 }
 
+.card-bottom {
+  margin-top: auto;
+}
+
 .course-details {
   display: flex;
   align-items: center;
@@ -907,7 +977,12 @@ button {
   color: #19382d;
 }
 
-.fully-booked,
+.fully-booked {
+  color: #a52e2e;
+  font-weight: bold;
+  font-size: 13px;
+}
+
 .error {
   color: #a52e2e;
   font-weight: bold;
@@ -916,6 +991,58 @@ button {
 .status-message {
   color: #66756b;
   padding: 25px 0;
+}
+
+/* ======================================
+   ADD TO CART BUTTON - NEW
+====================================== */
+
+.add-to-cart-button {
+  display: block;
+  width: 100%;
+  margin-top: 18px;
+  padding: 14px 18px;
+
+  background: #19382d;
+  color: #f5f2e9;
+
+  border: 1px solid #19382d;
+  border-radius: 4px;
+
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 0.4px;
+
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+/* Button hover effect */
+.add-to-cart-button:hover:not(:disabled) {
+  background: #2d5944;
+  transform: translateY(-2px);
+}
+
+/* Button click effect */
+.add-to-cart-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Fully booked / disabled button */
+.add-to-cart-button:disabled {
+  background: #e5e7e2;
+  border-color: #d0d5ce;
+  color: #788579;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Keyboard accessibility */
+.add-to-cart-button:focus-visible {
+  outline: 2px solid #c5ab75;
+  outline-offset: 3px;
 }
 
 /* ======================================
@@ -992,7 +1119,7 @@ button {
 .subject-tabs button {
   border: 1px solid #aebcaf;
   border-radius: 4px;
-  background: white;
+  background: #ffffff;
   color: #19382d;
   padding: 12px 18px;
   font-size: 13px;
@@ -1002,12 +1129,12 @@ button {
 .subject-tabs button:hover,
 .subject-tabs button.selected {
   background: #19382d;
-  color: white;
+  color: #ffffff;
 }
 
 .faculty-placeholder {
   padding: 45px;
-  background: white;
+  background: #ffffff;
   border-left: 4px solid #c5ab75;
   max-width: 850px;
 }
@@ -1103,6 +1230,10 @@ button {
     height: 300px;
   }
 
+  .hero-image-overlay span {
+    font-size: 20px;
+  }
+
   .section-inner {
     padding-top: 60px;
     padding-bottom: 60px;
@@ -1165,5 +1296,11 @@ button {
   .faculty-placeholder {
     padding: 25px;
   }
+
+  .add-to-cart-button {
+    padding: 15px;
+  }
 }
+
 </style>
+
