@@ -15,6 +15,7 @@ const cart = ref([])
 const customerName = ref('')
 const customerPhone = ref('')
 const checkoutMessage = ref('')
+const isSubmitting = ref(false)
 
 // DISPLAY PREFERENCE: dark mode (stored in this browser)
 const isDarkMode = ref(false)
@@ -35,14 +36,60 @@ const canCheckout = computed(() => {
     customerPhone.value.trim()
   )
 
-  return cart.value.length > 0 && validName && validPhone
+  return cart.value.length > 0 && validName && validPhone && !isSubmitting.value
 })
 
-function prepareCheckout() {
+async function prepareCheckout() {
   if (!canCheckout.value) return
 
-  checkoutMessage.value =
-    'Details validated. Backend order submission is not yet connected.'
+  isSubmitting.value = true
+  checkoutMessage.value = ''
+
+  try {
+    const response = await fetch('http://localhost:3000/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: customerName.value.trim(),
+        phone: customerPhone.value.trim(),
+        lessonIDs: [...cart.value]
+      })
+    })
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      checkoutMessage.value = response.status === 409
+        ? 'Booking declined: a selected lesson has insufficient spaces. No booking was made. Please review your cart.'
+        : (result.error || 'The booking could not be completed.')
+      return
+    }
+
+    if (response.status !== 201 || !result.orderId) {
+      checkoutMessage.value =
+        'Unexpected booking response. Check saved orders before trying again.'
+      return
+    }
+
+    // The backend has already deducted the spaces inside its transaction.
+    // Do not decrease them again from Vue or send another stock-changing PUT.
+    cart.value = []
+    customerName.value = ''
+    customerPhone.value = ''
+
+    checkoutMessage.value =
+      `Booking confirmed! Order ID: ${result.orderId}. ` +
+      `${result.numberOfSpaces} space(s) reserved.`
+
+    // Refresh the view with the authoritative MongoDB availability.
+    await fetchLessons()
+  } catch (error) {
+    console.error('Checkout request failed:', error)
+    checkoutMessage.value =
+      'Could not confirm the booking. It may have been saved; check MongoDB orders before trying again.'
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
 // ======================================
@@ -128,7 +175,7 @@ function showFaculty() {
 
 // Open or close the cart using the same navigation button
 function toggleCart() {
-  if (cart.value.length === 0) return
+  if (cart.value.length === 0 || isSubmitting.value) return
 
   if (currentPage.value === 'cart') {
     showHome('courses')
@@ -216,6 +263,7 @@ onMounted(() => {
 
           <span class="brand-text">
             <strong>HUZ ACADEMY</strong>
+            <small>EXCELLENCE IN EDUCATION</small>
           </span>
         </button>
 
@@ -246,7 +294,7 @@ onMounted(() => {
           <button
             class="cart-nav-button"
             :class="{ active: currentPage === 'cart' }"
-            :disabled="cart.length === 0"
+            :disabled="cart.length === 0 || isSubmitting"
             @click="toggleCart"
           >
             Cart ({{ cart.length }})
@@ -284,8 +332,9 @@ onMounted(() => {
             </h1>
 
             <p class="hero-description">
-             This is a fictional academy created by Huzaifa Abawa for the CST3144 Full Stack Development Coursework
-            He hopes you enjoy and appreciate the time and effort that went into creating this website!
+              Inspiring young minds through exceptional
+              after-school education, creative exploration
+              and meaningful learning experiences.
             </p>
 
             <div class="hero-actions">
@@ -316,7 +365,7 @@ onMounted(() => {
 
             <div class="hero-image-overlay">
               <span>HUZ ACADEMY</span>
-              <p>Fictional Academy</p>
+              <p>Knowledge · Growth · Excellence</p>
             </div>
 
           </div>
@@ -329,7 +378,17 @@ onMounted(() => {
         <div class="section-inner">
 
           <div class="section-heading">
+            <p class="section-label">
+              ACADEMIC PROGRAMMES
+            </p>
+
             <h2>Explore Our Courses</h2>
+
+            <p class="section-description">
+              Discover a range of after-school programmes
+              designed to develop knowledge, confidence,
+              creativity and lifelong skills.
+            </p>
           </div>
 
           <!-- SORTING CONTROLS -->
@@ -457,7 +516,7 @@ onMounted(() => {
         <div class="section-inner about-layout">
           <div class="about-heading">
             <p class="eyebrow">ABOUT OUR INSTITUTION</p>
-            <h2>Coursework Academy.</h2>
+            <h2>Education with purpose.</h2>
             <div class="gold-divider"></div>
           </div>
 
@@ -492,7 +551,13 @@ onMounted(() => {
             OUR TEACHING COMMUNITY
           </p>
 
-          <h1>Faculty Information</h1>
+          <h1>Meet Our Faculty</h1>
+
+          <p class="section-description">
+            Explore our academic departments and discover
+            the educators behind each programme.
+          </p>
+
         </div>
 
         <h2 class="subject-heading">
@@ -559,7 +624,7 @@ onMounted(() => {
           before proceeding to checkout.
         </p>
 
-        <p v-if="cartLessons.length === 0" class="status-message">
+        <p v-if="cartLessons.length === 0 && !checkoutMessage" class="status-message">
           Your shopping cart is empty.
         </p>
 
@@ -577,6 +642,7 @@ onMounted(() => {
 
             <button
               class="remove-cart-button"
+              :disabled="isSubmitting"
               @click="removeFromCart(index)"
             >
               Remove
@@ -589,12 +655,12 @@ onMounted(() => {
           <strong>Rs {{ cartTotal }}</strong>
         </div>
 
-        <button class="back-to-courses-button" @click="showHome('courses')">
+        <button class="back-to-courses-button" :disabled="isSubmitting" @click="showHome('courses')">
           Continue Browsing Lessons
         </button>
 
         
-        <!-- CHECKOUT FORM: validation only; no backend submission yet -->
+        <!-- CHECKOUT FORM: submits the order to MongoDB via Express -->
         <form class="checkout-form" @submit.prevent="prepareCheckout">
           <h2>Checkout</h2>
 
@@ -624,7 +690,7 @@ onMounted(() => {
             class="checkout-button"
             :disabled="!canCheckout"
           >
-            Checkout
+            {{ isSubmitting ? 'Submitting...' : 'Checkout' }}
           </button>
 
           <p v-if="checkoutMessage" class="checkout-message" role="status">
@@ -641,9 +707,11 @@ onMounted(() => {
 
         <div class="footer-brand">
           <strong>HUZ ACADEMY</strong>
+          <span>Knowledge · Growth · Excellence</span>
         </div>
 
         <div class="footer-location">
+          Learning with purpose · Mauritius
         </div>
 
         <small>
