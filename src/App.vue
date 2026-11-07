@@ -16,6 +16,15 @@ const customerName = ref('')
 const customerPhone = ref('')
 const checkoutMessage = ref('')
 
+// DISPLAY PREFERENCE: dark mode (stored in this browser)
+const isDarkMode = ref(false)
+
+function toggleDarkMode() {
+  isDarkMode.value = !isDarkMode.value
+  localStorage.setItem('huz-academy-dark-mode', String(isDarkMode.value))
+}
+
+
 // Validate the customer's details using JavaScript
 const canCheckout = computed(() => {
   const validName = /^[A-Za-z]+(?: [A-Za-z]+)*$/.test(
@@ -188,11 +197,15 @@ function removeFromCart(index) {
   lesson.space += 1
 }
 
-onMounted(fetchLessons)
+onMounted(() => {
+  // Restore the previously selected theme after refreshing the page
+  isDarkMode.value = localStorage.getItem('huz-academy-dark-mode') === 'true'
+  fetchLessons()
+})
 </script>
 
 <template>
-  <div class="website">
+  <div class="website" :class="{ 'dark-mode': isDarkMode }">
 
     <!-- NAVIGATION BAR -->
     <header class="site-header">
@@ -203,7 +216,6 @@ onMounted(fetchLessons)
 
           <span class="brand-text">
             <strong>HUZ ACADEMY</strong>
-            <small>EXCELLENCE IN EDUCATION</small>
           </span>
         </button>
 
@@ -239,6 +251,17 @@ onMounted(fetchLessons)
           >
             Cart ({{ cart.length }})
           </button>
+
+          <!-- Switch between light and dark mode -->
+          <button
+            type="button"
+            class="theme-toggle"
+            :aria-pressed="isDarkMode"
+            :aria-label="isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'"
+            @click="toggleDarkMode"
+          >
+            {{ isDarkMode ? '☀ Light mode' : '☾ Dark mode' }}
+          </button>
         </nav>
 
       </div>
@@ -261,9 +284,8 @@ onMounted(fetchLessons)
             </h1>
 
             <p class="hero-description">
-              Inspiring young minds through exceptional
-              after-school education, creative exploration
-              and meaningful learning experiences.
+             This is a fictional academy created by Huzaifa Abawa for the CST3144 Full Stack Development Coursework
+            He hopes you enjoy and appreciate the time and effort that went into creating this website!
             </p>
 
             <div class="hero-actions">
@@ -294,7 +316,7 @@ onMounted(fetchLessons)
 
             <div class="hero-image-overlay">
               <span>HUZ ACADEMY</span>
-              <p>Knowledge · Growth · Excellence</p>
+              <p>Fictional Academy</p>
             </div>
 
           </div>
@@ -307,17 +329,7 @@ onMounted(fetchLessons)
         <div class="section-inner">
 
           <div class="section-heading">
-            <p class="section-label">
-              ACADEMIC PROGRAMMES
-            </p>
-
             <h2>Explore Our Courses</h2>
-
-            <p class="section-description">
-              Discover a range of after-school programmes
-              designed to develop knowledge, confidence,
-              creativity and lifelong skills.
-            </p>
           </div>
 
           <!-- SORTING CONTROLS -->
@@ -445,7 +457,7 @@ onMounted(fetchLessons)
         <div class="section-inner about-layout">
           <div class="about-heading">
             <p class="eyebrow">ABOUT OUR INSTITUTION</p>
-            <h2>Education with purpose.</h2>
+            <h2>Coursework Academy.</h2>
             <div class="gold-divider"></div>
           </div>
 
@@ -480,13 +492,7 @@ onMounted(fetchLessons)
             OUR TEACHING COMMUNITY
           </p>
 
-          <h1>Meet Our Faculty</h1>
-
-          <p class="section-description">
-            Explore our academic departments and discover
-            the educators behind each programme.
-          </p>
-
+          <h1>Faculty Information</h1>
         </div>
 
         <h2 class="subject-heading">
@@ -635,11 +641,9 @@ onMounted(fetchLessons)
 
         <div class="footer-brand">
           <strong>HUZ ACADEMY</strong>
-          <span>Knowledge · Growth · Excellence</span>
         </div>
 
         <div class="footer-location">
-          Learning with purpose · Mauritius
         </div>
 
         <small>
@@ -1508,6 +1512,153 @@ button {
 .footer-location,
 .footer-inner small {
   color: #acbbaf;
+}
+
+/* ======================================
+   LIGHT / DARK MODE TOGGLE
+   Only applies when the root .website has .dark-mode
+====================================== */
+
+.nav-tabs .theme-toggle {
+  padding: 9px 13px;
+  border: 1px solid #c5ab75;
+  border-radius: 5px;
+  color: #f5f2e9;
+  white-space: nowrap;
+}
+
+.nav-tabs .theme-toggle:hover,
+.nav-tabs .theme-toggle:focus-visible {
+  background: #c5ab75;
+  color: #102f26;
+}
+
+.website.dark-mode {
+  background: #101e18;
+  color: #edf3eb;
+}
+
+.dark-mode .site-header,
+.dark-mode .hero {
+  background: #0a1c15;
+}
+
+.dark-mode .about-section {
+  background: #17372a;
+}
+
+.dark-mode .site-footer {
+  background: #07150f;
+}
+
+.dark-mode .courses-section,
+.dark-mode .faculty-page,
+.dark-mode .cart-page {
+  background: #101e18;
+}
+
+.dark-mode .course-card,
+.dark-mode .faculty-placeholder,
+.dark-mode .cart-item,
+.dark-mode .checkout-form {
+  background: #1d3329;
+  border-color: #3a5447;
+}
+
+.dark-mode .section-heading h2,
+.dark-mode .faculty-page h1,
+.dark-mode .cart-page h1,
+.dark-mode .course-card h3,
+.dark-mode .subject-heading,
+.dark-mode .faculty-placeholder h3,
+.dark-mode .cart-item h2,
+.dark-mode .checkout-form h2,
+.dark-mode .checkout-form label,
+.dark-mode .sort-controls label,
+.dark-mode .course-details strong,
+.dark-mode .cart-item span,
+.dark-mode .cart-total,
+.dark-mode .checkout-message {
+  color: #f2f6ed;
+}
+
+.dark-mode .section-description,
+.dark-mode .course-location,
+.dark-mode .course-details span,
+.dark-mode .card-top,
+.dark-mode .status-message,
+.dark-mode .cart-item p,
+.dark-mode .faculty-placeholder p:last-child {
+  color: #bacbbd;
+}
+
+.dark-mode .course-category,
+.dark-mode .courses-section .section-label,
+.dark-mode .faculty-page .section-label {
+  color: #ddc28a;
+}
+
+.dark-mode .course-details,
+.dark-mode .cart-total {
+  border-color: #42604f;
+}
+
+.dark-mode .cart-summary {
+  background: #264535;
+  color: #f2f6ed;
+  border-color: #476652;
+  border-left-color: #c5ab75;
+}
+
+.dark-mode .sort-controls select,
+.dark-mode .checkout-form input,
+.dark-mode .subject-tabs button {
+  background: #14271e;
+  color: #edf3eb;
+  border-color: #52715e;
+}
+
+.dark-mode .subject-tabs button:hover,
+.dark-mode .subject-tabs button.selected {
+  background: #c5ab75;
+  color: #102f26;
+}
+
+.dark-mode .add-to-cart-button,
+.dark-mode .checkout-button,
+.dark-mode .back-to-courses-button {
+  background: #c5ab75;
+  border-color: #c5ab75;
+  color: #102f26;
+}
+
+.dark-mode .add-to-cart-button:hover:not(:disabled),
+.dark-mode .checkout-button:hover:not(:disabled),
+.dark-mode .back-to-courses-button:hover {
+  background: #dac48f;
+  border-color: #dac48f;
+}
+
+.dark-mode .add-to-cart-button:disabled,
+.dark-mode .checkout-button:disabled {
+  background: #344b3e;
+  border-color: #435a4c;
+  color: #adc0ae;
+}
+
+.dark-mode .remove-cart-button {
+  background: #302321;
+  border-color: #b9756d;
+  color: #ffbab0;
+}
+
+.dark-mode .remove-cart-button:hover {
+  background: #4b2e2b;
+}
+
+.dark-mode .fully-booked,
+.dark-mode .error {
+  color: #ffafa8;
 }
 
 /* ======================================
