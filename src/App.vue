@@ -9,6 +9,11 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 const lessons = ref([])
 const loading = ref(true)
 const errorMessage = ref('')
+
+// Teachers are retrieved from the backend's MongoDB-powered API.
+const teachers = ref([])
+const teachersLoading = ref(true)
+const teachersError = ref('')
 // Store the IDs of lessons added to the cart
 const cart = ref([])
 // Checkout form
@@ -225,11 +230,22 @@ function toggleCart() {
   }
 }
 
-// Generate Faculty subject tabs from MongoDB
+// Generate Faculty subject tabs from the teachers' actual lessons.
 const subjects = computed(() => {
-  return [...new Set(
-    lessons.value.map(lesson => lesson.topic)
-  )].sort((a, b) => a.localeCompare(b))
+  const topics = teachers.value.flatMap(teacher =>
+    (teacher.lessons || []).map(lesson => lesson.topic)
+  )
+  return [...new Set(topics)].sort((a, b) => a.localeCompare(b))
+})
+
+// Display all three teachers by default, or filter by selected subject.
+const filteredTeachers = computed(() => {
+  if (!selectedSubject.value) return teachers.value
+  return teachers.value.filter(teacher =>
+    (teacher.lessons || []).some(lesson =>
+      lesson.topic === selectedSubject.value
+    )
+  )
 })
 
 // ======================================
@@ -256,6 +272,31 @@ async function fetchLessons() {
       'Unable to load lessons. Please try again.'
   } finally {
     loading.value = false
+  }
+}
+
+// ======================================
+// FETCH TEACHERS FROM BACKEND
+// ======================================
+
+async function fetchTeachers() {
+  teachersLoading.value = true
+  teachersError.value = ''
+
+  try {
+    const response = await fetch('http://localhost:3000/teachers')
+    if (!response.ok) throw new Error('Failed to retrieve teachers')
+
+    const data = await response.json()
+    if (!Array.isArray(data)) throw new Error('Invalid teachers response')
+
+    teachers.value = data
+    console.log('Teachers retrieved:', teachers.value)
+  } catch (error) {
+    console.error('Error fetching teachers:', error)
+    teachersError.value = 'Unable to load faculty members. Please try again.'
+  } finally {
+    teachersLoading.value = false
   }
 }
 
@@ -288,6 +329,7 @@ onMounted(() => {
   // Restore the previously selected theme after refreshing the page
   isDarkMode.value = localStorage.getItem('huz-academy-dark-mode') === 'true'
   fetchLessons()
+  fetchTeachers()
 })
 </script>
 
@@ -600,55 +642,80 @@ onMounted(() => {
 
         </div>
 
-        <h2 class="subject-heading">
-          Choose a Subject
-        </h2>
-
-        <p v-if="loading">
-          Loading subjects...
+        <p v-if="teachersLoading" class="status-message" role="status">
+          Loading faculty members...
         </p>
 
-        <p v-else-if="errorMessage" class="error">
-          {{ errorMessage }}
-        </p>
-
-        <!-- SUBJECT TABS -->
-        <div v-else class="subject-tabs">
-
-          <button
-            v-for="subject in subjects"
-            :key="subject"
-            :class="{ selected: selectedSubject === subject }"
-            @click="selectedSubject = subject"
-          >
-            {{ subject }}
+        <div v-else-if="teachersError" class="faculty-error">
+          <p class="error">{{ teachersError }}</p>
+          <button class="faculty-retry-button" @click="fetchTeachers">
+            Try Again
           </button>
-
         </div>
 
-        <!-- FACULTY PLACEHOLDER -->
-        <div class="faculty-placeholder">
+        <p v-else-if="teachers.length === 0" class="status-message">
+          No faculty profiles are currently available.
+        </p>
 
-          <p class="section-label">
-            FACULTY DIRECTORY
-          </p>
+        <template v-else>
+          <h2 class="subject-heading">Browse by Subject</h2>
 
-          <h3>
-            {{ selectedSubject || 'Our Academic Departments' }}
-          </h3>
+          <!-- Choose a subject to find its teacher. -->
+          <div class="subject-tabs" aria-label="Filter teachers by subject">
+            <button
+              :class="{ selected: selectedSubject === '' }"
+              :aria-pressed="selectedSubject === ''"
+              @click="selectedSubject = ''"
+            >
+              All Teachers
+            </button>
+            <button
+              v-for="subject in subjects"
+              :key="subject"
+              :class="{ selected: selectedSubject === subject }"
+              :aria-pressed="selectedSubject === subject"
+              @click="selectedSubject = subject"
+            >
+              {{ subject }}
+            </button>
+          </div>
 
-          <p v-if="selectedSubject">
-            Teacher profiles for {{ selectedSubject }}
-            will appear here once faculty information
-            is connected to MongoDB Atlas.
-          </p>
+          <div class="faculty-results-heading">
+            <h2>{{ selectedSubject || 'Our Educators' }}</h2>
+            <span>{{ filteredTeachers.length }} teacher{{ filteredTeachers.length === 1 ? '' : 's' }}</span>
+          </div>
 
-          <p v-else>
-            Select a subject above to explore
-            its teaching department.
-          </p>
-
-        </div>
+          <!-- Teacher portraits and subjects come from GET /teachers. -->
+          <div class="faculty-grid">
+            <article
+              v-for="teacher in filteredTeachers"
+              :key="teacher._id"
+              class="faculty-card"
+            >
+              <img
+                :src="`http://localhost:3000/images/${teacher.image}`"
+                :alt="`Portrait of ${teacher.firstName} ${teacher.lastName}`"
+                class="faculty-portrait"
+                loading="lazy"
+              />
+              <div class="faculty-card-content">
+                <p class="faculty-role">HUZ ACADEMY FACULTY</p>
+                <h3>{{ teacher.firstName }} {{ teacher.lastName }}</h3>
+                <p class="faculty-specialism">Subjects taught</p>
+                <div class="faculty-subjects">
+                  <span
+                    v-for="lesson in teacher.lessons"
+                    :key="lesson._id"
+                    class="faculty-subject"
+                    :class="{ 'is-selected': selectedSubject === lesson.topic }"
+                  >
+                    {{ lesson.topic }}
+                  </span>
+                </div>
+              </div>
+            </article>
+          </div>
+        </template>
 
       </div>
     </main>
@@ -1377,23 +1444,109 @@ button {
   color: #ffffff;
 }
 
-.faculty-placeholder {
-  padding: 45px;
-  background: #ffffff;
-  border-left: 4px solid #c5ab75;
-  max-width: 850px;
+.faculty-results-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  margin: 0 0 22px;
 }
 
-.faculty-placeholder h3 {
-  font: normal 30px Georgia, serif;
+.faculty-results-heading h2 {
+  font: normal 29px Georgia, serif;
   color: #19382d;
-  margin: 0 0 18px;
+  margin: 0;
 }
 
-.faculty-placeholder p:last-child {
+.faculty-results-heading span {
   color: #66756b;
-  line-height: 1.8;
-  margin-bottom: 0;
+  font-size: 13px;
+}
+
+.faculty-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.faculty-card {
+  min-width: 0;
+  background: #ffffff;
+  border: 1px solid #e2e5dc;
+  border-top: 3px solid #244c3b;
+  border-radius: 5px;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.faculty-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 25px rgba(16, 47, 38, 0.10);
+}
+
+.faculty-portrait {
+  display: block;
+  width: 100%;
+  height: 300px;
+  object-fit: cover;
+  object-position: center top;
+  background: #e8eae3;
+}
+
+.faculty-card-content {
+  padding: 26px;
+}
+
+.faculty-role {
+  margin: 0 0 14px;
+  font-weight: bold;
+  font-size: 10px;
+  letter-spacing: 1.7px;
+  color: #907342;
+}
+
+.faculty-card h3 {
+  font: normal 29px Georgia, serif;
+  margin: 0 0 18px;
+  color: #19382d;
+}
+
+.faculty-specialism {
+  padding-top: 15px;
+  border-top: 1px solid #e8eae3;
+  margin: 0 0 13px;
+  font-size: 12px;
+  color: #66756b;
+}
+
+.faculty-subjects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.faculty-subject {
+  padding: 8px 10px;
+  background: #edf1eb;
+  border: 1px solid #d9e3d8;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #244c3b;
+}
+
+.faculty-subject.is-selected {
+  background: #19382d;
+  color: #ffffff;
+  border-color: #19382d;
+}
+
+.faculty-retry-button {
+  margin-top: 12px;
+  padding: 12px 18px;
+  border: 1px solid #19382d;
+  border-radius: 4px;
+  background: #19382d;
+  color: #ffffff;
 }
 
 /* ======================================
@@ -1666,7 +1819,7 @@ button {
 }
 
 .dark-mode .course-card,
-.dark-mode .faculty-placeholder,
+.dark-mode .faculty-card,
 .dark-mode .cart-item,
 .dark-mode .checkout-form {
   background: #1d3329;
@@ -1678,7 +1831,8 @@ button {
 .dark-mode .cart-page h1,
 .dark-mode .course-card h3,
 .dark-mode .subject-heading,
-.dark-mode .faculty-placeholder h3,
+.dark-mode .faculty-card h3,
+.dark-mode .faculty-results-heading h2,
 .dark-mode .cart-item h2,
 .dark-mode .checkout-form h2,
 .dark-mode .checkout-form label,
@@ -1696,7 +1850,8 @@ button {
 .dark-mode .card-top,
 .dark-mode .status-message,
 .dark-mode .cart-item p,
-.dark-mode .faculty-placeholder p:last-child {
+.dark-mode .faculty-specialism,
+.dark-mode .faculty-results-heading span {
   color: #bacbbd;
 }
 
@@ -1710,6 +1865,29 @@ button {
 .dark-mode .cart-total {
   border-color: #42604f;
 }
+
+.dark-mode .faculty-subject {
+  color: #e4f0e7;
+  background: #294837;
+  border-color: #456552;
+}
+
+.dark-mode .faculty-subject.is-selected {
+  color: #102f26;
+  background: #c5ab75;
+  border-color: #c5ab75;
+}
+
+.dark-mode .faculty-specialism {
+  border-color: #42604f;
+}
+
+.dark-mode .faculty-retry-button {
+  background: #c5ab75;
+  color: #102f26;
+  border-color: #c5ab75;
+}
+
 
 .dark-mode .cart-summary {
   background: #264535;
@@ -1774,6 +1952,10 @@ button {
 ====================================== */
 
 @media (max-width: 900px) {
+  .faculty-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .hero-inner {
     gap: 30px;
   }
@@ -1788,6 +1970,14 @@ button {
 }
 
 @media (max-width: 750px) {
+  .faculty-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .faculty-portrait {
+    height: 340px;
+  }
+
   .header-inner {
     flex-direction: column;
     align-items: center;
@@ -1871,10 +2061,6 @@ button {
   .section-heading h2,
   .faculty-page h1 {
     font-size: 34px;
-  }
-
-  .faculty-placeholder {
-    padding: 25px;
   }
 
   .add-to-cart-button {
