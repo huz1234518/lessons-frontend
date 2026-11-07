@@ -39,6 +39,39 @@ const canCheckout = computed(() => {
   return cart.value.length > 0 && validName && validPhone && !isSubmitting.value
 })
 
+// Coursework PUT fetch: confirm the availability returned by POST.
+// POST has already reserved the spaces; we do not subtract again.
+async function confirmBookedSpaces(updatedLessons) {
+  if (!Array.isArray(updatedLessons) || updatedLessons.length === 0) {
+    return false
+  }
+
+  let allConfirmed = true
+
+  for (const lesson of updatedLessons) {
+    try {
+      const response = await fetch(
+        `http://localhost:3000/lessons/${lesson.id}?expectedSpace=${lesson.space}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ space: lesson.space })
+        }
+      )
+
+      if (!response.ok) {
+        allConfirmed = false
+        console.warn('Availability confirmation skipped:', lesson.id, response.status)
+      }
+    } catch (error) {
+      allConfirmed = false
+      console.warn('Could not confirm lesson availability:', error)
+    }
+  }
+
+  return allConfirmed
+}
+
 async function prepareCheckout() {
   if (!canCheckout.value) return
 
@@ -71,8 +104,8 @@ async function prepareCheckout() {
       return
     }
 
-    // The backend has already deducted the spaces inside its transaction.
-    // Do not decrease them again from Vue or send another stock-changing PUT.
+    // Booking is already committed by POST. Never retry POST because
+    // an optional PUT confirmation failed.
     cart.value = []
     customerName.value = ''
     customerPhone.value = ''
@@ -81,7 +114,14 @@ async function prepareCheckout() {
       `Booking confirmed! Order ID: ${result.orderId}. ` +
       `${result.numberOfSpaces} space(s) reserved.`
 
-    // Refresh the view with the authoritative MongoDB availability.
+    // Send a guarded PUT for each booked lesson, without deducting again.
+    const availabilityConfirmed = await confirmBookedSpaces(result.updatedLessons)
+    if (!availabilityConfirmed) {
+      checkoutMessage.value +=
+        ' Availability confirmation was skipped for one or more lessons; your booking is still confirmed.'
+    }
+
+    // Always reload the latest spaces, including other customers' bookings.
     await fetchLessons()
   } catch (error) {
     console.error('Checkout request failed:', error)
