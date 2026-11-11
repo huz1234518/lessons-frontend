@@ -56,7 +56,7 @@ async function confirmBookedSpaces(updatedLessons) {
   for (const lesson of updatedLessons) {
     try {
       const response = await fetch(
-        `http://localhost:3000/lessons/${lesson.id}?expectedSpace=${lesson.space}`,
+        `https://m00954001-afterschoollessons.onrender.com/lessons/${lesson.id}?expectedSpace=${lesson.space}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -84,7 +84,7 @@ async function prepareCheckout() {
   checkoutMessage.value = ''
 
   try {
-    const response = await fetch('http://localhost:3000/orders', {
+    const response = await fetch('https://m00954001-afterschoollessons.onrender.com/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -255,7 +255,7 @@ const filteredTeachers = computed(() => {
 async function fetchLessons() {
   try {
     const response = await fetch(
-      'http://localhost:3000/lessons'
+      'https://m00954001-afterschoollessons.onrender.com/lessons'
     )
 
     if (!response.ok) {
@@ -284,7 +284,7 @@ async function fetchTeachers() {
   teachersError.value = ''
 
   try {
-    const response = await fetch('http://localhost:3000/teachers')
+    const response = await fetch('https://m00954001-afterschoollessons.onrender.com/teachers')
     if (!response.ok) throw new Error('Failed to retrieve teachers')
 
     const data = await response.json()
@@ -528,7 +528,7 @@ onMounted(() => {
 
               <!-- COURSE IMAGE FROM EXPRESS SERVER -->
               <img
-                :src="`http://localhost:3000/images/${lesson.image}.jpg`"
+                :src="`https://m00954001-afterschoollessons.onrender.com/images/${lesson.image}.jpg`"
                 :alt="`${lesson.topic} course`"
                 class="course-image"
               />
@@ -693,7 +693,7 @@ onMounted(() => {
               class="faculty-card"
             >
               <img
-                :src="`http://localhost:3000/images/${teacher.image}`"
+                :src="`https://m00954001-afterschoollessons.onrender.com/images/${teacher.image}`"
                 :alt="`Portrait of ${teacher.firstName} ${teacher.lastName}`"
                 class="faculty-portrait"
                 loading="lazy"
