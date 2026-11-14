@@ -10,6 +10,16 @@ const lessons = ref([])
 const loading = ref(true)
 const errorMessage = ref('')
 
+// ======================================
+// BACKEND LESSON SEARCH
+// ======================================
+
+const searchTerm = ref('')
+const searchLoading = ref(false)
+const searchError = ref('')
+
+// Prevent older search responses from replacing newer results.
+let latestLessonsRequest = 0
 // Teachers are retrieved from the backend's MongoDB-powered API.
 const teachers = ref([])
 const teachersLoading = ref(true)
@@ -127,7 +137,7 @@ async function prepareCheckout() {
     }
 
     // Always reload the latest spaces, including other customers' bookings.
-    await fetchLessons()
+    await fetchLessons(searchTerm.value)
   } catch (error) {
     console.error('Checkout request failed:', error)
     checkoutMessage.value =
@@ -252,27 +262,81 @@ const filteredTeachers = computed(() => {
 // FETCH LESSONS FROM BACKEND
 // ======================================
 
-async function fetchLessons() {
+// ======================================
+// FETCH AND SEARCH LESSONS FROM BACKEND
+// ======================================
+
+async function fetchLessons(search = '') {
+  const requestId = ++latestLessonsRequest
+  const isInitialLoad = loading.value
+  const keyword = String(search || '').trim()
+
+  searchError.value = ''
+
+  if (!isInitialLoad) {
+    searchLoading.value = true
+  }
+
   try {
-    const response = await fetch(
+    const url = new URL(
       'https://m00954001-afterschoollessons.onrender.com/lessons'
     )
+
+    // Send the search term to the backend.
+    // MongoDB performs the actual filtering.
+    if (keyword) {
+      url.searchParams.set('search', keyword)
+    }
+
+    const response = await fetch(url.toString())
 
     if (!response.ok) {
       throw new Error('Failed to retrieve lessons')
     }
 
-    lessons.value = await response.json()
+    const data = await response.json()
 
-    console.log('Lessons retrieved:', lessons.value)
+    if (!Array.isArray(data)) {
+      throw new Error('Invalid lessons response')
+    }
+
+    // Only accept the latest request's response.
+    if (requestId !== latestLessonsRequest) return
+
+    lessons.value = data
+
+    console.log(
+      keyword
+        ? `Search results for "${keyword}":`
+        : 'All lessons retrieved:',
+      lessons.value
+    )
+
   } catch (error) {
     console.error('Error fetching lessons:', error)
 
-    errorMessage.value =
-      'Unable to load lessons. Please try again.'
+    if (requestId === latestLessonsRequest) {
+      if (isInitialLoad) {
+        errorMessage.value =
+          'Unable to load lessons. Please try again.'
+      } else {
+        searchError.value =
+          'Unable to retrieve search results. Please try again.'
+      }
+    }
+
   } finally {
-    loading.value = false
+    if (requestId === latestLessonsRequest) {
+      loading.value = false
+      searchLoading.value = false
+    }
   }
+}
+
+// Clear the search and retrieve all lessons again.
+function clearSearch() {
+  searchTerm.value = ''
+  fetchLessons('')
 }
 
 // ======================================
@@ -390,7 +454,7 @@ onMounted(() => {
             :aria-label="isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'"
             @click="toggleDarkMode"
           >
-            {{ isDarkMode ? '☀ Light mode' : '☾ Dark mode' }}
+            {{ isDarkMode ? 'Light ' : 'Dark ' }}
           </button>
         </nav>
 
@@ -472,7 +536,67 @@ onMounted(() => {
               creativity and lifelong skills.
             </p>
           </div>
+          
+          <!-- ======================================
+     BACKEND LESSON SEARCH
+====================================== -->
 
+          <div class="lesson-search">
+            <label for="lessonSearch">
+              Search Our Courses
+            </label>
+            <div class="search-input-wrapper">
+              <input
+              id="lessonSearch"
+              v-model="searchTerm"
+              type="search"
+              placeholder="Search by subject, location, price or availability..."
+              autocomplete="off"
+              @input="fetchLessons(searchTerm)"
+              />
+
+              <button
+                v-if="searchTerm"
+                type="button"
+                class="clear-search-button"
+               @click="clearSearch"
+               aria-label="Clear search"
+              >
+                Clear
+              </button>
+            </div>
+
+            <p class="search-description">
+              Find lessons by subject, location, price or available spaces.
+            </p>
+
+            <p
+              v-if="searchLoading"
+              class="search-status"
+              role="status"
+            >
+              Searching courses...
+            </p>
+
+            <p
+              v-else-if="searchError"
+              class="error"
+              role="alert"
+            >
+              {{ searchError }}
+            </p>
+
+            <p
+              v-else-if="searchTerm && !loading && !errorMessage"
+              class="search-results-count"
+              role="status"
+            >
+              {{ lessons.length }}
+              matching course{{ lessons.length === 1 ? '' : 's' }}
+              found for "{{ searchTerm }}"
+            </p>
+
+          </div>
           <!-- SORTING CONTROLS -->
           <div class="sort-controls">
 
@@ -508,6 +632,20 @@ onMounted(() => {
 
           <p v-else-if="errorMessage" class="error">
             {{ errorMessage }}
+          </p>
+          <p
+            v-else-if="searchError"
+            class="error"
+          >
+            {{ searchError }}
+          </p>
+          
+          <p
+            v-else-if="lessons.length === 0 && searchTerm"
+            class="status-message"
+            >
+              No courses found matching "{{ searchTerm }}".
+              Try another search term.
           </p>
 
           <p
@@ -2065,6 +2203,109 @@ button {
 
   .add-to-cart-button {
     padding: 15px;
+  }
+}
+
+/* ======================================
+   BACKEND LESSON SEARCH
+====================================== */
+
+.lesson-search {
+  max-width: 750px;
+  margin-bottom: 30px;
+}
+
+.lesson-search > label {
+  display: block;
+  margin-bottom: 12px;
+  color: #19382d;
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.search-input-wrapper {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.search-input-wrapper input {
+  flex: 1;
+  min-width: 0;
+  padding: 15px 16px;
+  background: #ffffff;
+  color: #19382d;
+  border: 1px solid #ced6cb;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 14px;
+}
+
+.search-input-wrapper input:focus {
+  outline: 2px solid #c5ab75;
+  outline-offset: 2px;
+}
+
+.search-description {
+  margin: 10px 0;
+  color: #66756b;
+  font-size: 12px;
+}
+
+.search-status,
+.search-results-count {
+  margin: 12px 0 0;
+  color: #244c3b;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.clear-search-button {
+  padding: 12px 18px;
+  background: #19382d;
+  color: #f5f2e9;
+  border: 1px solid #19382d;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.clear-search-button:hover {
+  background: #2d5944;
+}
+
+.dark-mode .lesson-search > label {
+  color: #f2f6ed;
+}
+
+.dark-mode .search-input-wrapper input {
+  background: #14271e;
+  color: #edf3eb;
+  border-color: #52715e;
+}
+
+.dark-mode .search-description {
+  color: #bacbbd;
+}
+
+.dark-mode .search-status,
+.dark-mode .search-results-count {
+  color: #ddc28a;
+}
+
+.dark-mode .clear-search-button {
+  background: #c5ab75;
+  color: #102f26;
+  border-color: #c5ab75;
+}
+
+@media (max-width: 480px) {
+  .search-input-wrapper {
+    flex-direction: column;
+  }
+
+  .clear-search-button {
+    width: 100%;
   }
 }
 
